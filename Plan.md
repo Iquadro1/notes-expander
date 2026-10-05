@@ -15,6 +15,11 @@ The system acts as a local Retrieval-Augmented Generation (RAG) tool. When the A
 *   **Language Fidelity:** the rendered document is written strictly in the language of the original notes; reference material from books in other languages (e.g. English textbooks) is translated/paraphrased into the notes' language.
 *   **Multi-Course Workspaces:** every course lives in `data/courses/<slug>/` with its own inbox, archive, and `output/<slug>/` folder; the one-line `ACTIVE_COURSE` file in the project root selects the course currently being processed (sources resolve inside it, so identical filenames like `01.pdf` never collide).
 *   **Modular CLI Architecture:** Built with `uv` for fast dependency management, turning Python scripts into accessible terminal tools for the AI agent.
+    `extract-refs` / `search-refs` (index + BM25, `--json`/`--batch`), `export-notes` (inbox → viewable PNGs),
+    `suggest-boxes` (ink-gap edges for highlight boxes), `new-lesson` (lesson scaffold for any inbox filename),
+    `lint-md` (checks without rendering, `--fix`), `render-html` (`--strict` fails on warnings),
+    `verify-html` (freshness + assets + headless chromium hover test), `archive-lesson` (guarded inbox → archive),
+    `sync-docs` (regenerates this doc's code from `src/` + `templates/`, `--check` for CI).
 
 ---
 
@@ -62,9 +67,18 @@ ai-notes-expander/
 │   └── index.json         # Serialized corpus for local search (shared)
 ├── src/
 │   ├── __init__.py
-│   ├── extract.py         # Parses PDFs and MD files to build index
-│   ├── search.py          # BM25 search utility
-│   └── render.py          # HTML generation, regex parsing (course-aware)
+│   ├── extract.py         # Builds db/index.json (shared + per-course refs)
+│   ├── search.py          # BM25 search utility (--json, --batch)
+│   ├── render.py          # HTML generation, regex parsing (course-aware, --strict)
+│   ├── export_notes.py    # Inbox PDFs -> viewable PNGs (export-notes)
+│   ├── suggest.py         # Ink-gap box edges (suggest-boxes)
+│   ├── new_lesson.py      # Lesson scaffold for any inbox filename (new-lesson)
+│   ├── lint.py            # Checks without rendering (lint-md --fix)
+│   ├── verify.py          # Freshness + assets + headless hover test (verify-html)
+│   ├── archive.py         # Guarded raw_notes -> processed_notes (archive-lesson)
+│   └── sync_docs.py       # Regenerates Plan.md code fences (sync-docs)
+├── scripts/
+│   └── verify-hover.js    # Puppeteer hover test used by verify-html
 ├── templates/
 │   └── layout.html        # Jinja2 template with hover UI, box overlay, MathJax
 └── output/
@@ -111,56 +125,87 @@ This script builds the searchable local index from your reference materials.
 > **Future Improvement - Math Extraction:** Currently, `PyMuPDF` extracts text reasonably well but can mangle complex LaTeX formulas into broken Unicode. While BM25 will still find surrounding keywords, the displayed context may have messy math. In the future, replacing `PyMuPDF` with a vision-based math OCR tool like `nougat` or `marker` would provide high-fidelity LaTeX extraction from reference PDFs.
 
 ```python
+"""Build the BM25 search index from reference PDFs and notes.
+
+Indexes (shared + per-course, so the searchable set matches what
+render-html can resolve):
+    data/reference_books/*.pdf          (shared, course="")
+    data/reference_notes/*.md           (shared, course="")
+    data/courses/<slug>/reference_books/*.pdf
+    data/courses/<slug>/reference_notes/*.md
+
+Each chunk: {source, page, text, course, path}.
+`source` stays the basename (backward compatible with search-refs output).
+"""
+
 import os
 import json
-import fitz  # PyMuPDF
+import pymupdf
 from pathlib import Path
 
-def extract_pdf_chunks(pdf_path):
-    doc = fitz.open(pdf_path)
+
+def extract_pdf_chunks(pdf_path, course=""):
+    doc = pymupdf.open(pdf_path)
     chunks = []
-    
+
     for page_num, page in enumerate(doc):
         # Extract by blocks (paragraphs) to maintain semantic context better than naive word counts
         blocks = page.get_text("blocks")
         for block in blocks:
             text = block[4].strip()
-            if len(text) > 20: # filter out tiny artifacts
+            if len(text) > 20:  # filter out tiny artifacts
                 chunks.append({
                     "source": os.path.basename(pdf_path),
                     "page": page_num + 1,
-                    "text": text
+                    "text": text,
+                    "course": course,
+                    "path": str(pdf_path),
                 })
     return chunks
 
-def extract_md_chunks(md_path):
+
+def extract_md_chunks(md_path, course=""):
     with open(md_path, 'r', encoding='utf-8') as f:
         paragraphs = f.read().split('\n\n')
-    
+
     return [{
         "source": os.path.basename(md_path),
         "page": "N/A",
-        "text": p.strip()
+        "text": p.strip(),
+        "course": course,
+        "path": str(md_path),
     } for p in paragraphs if len(p.strip()) > 20]
+
+
+def index_dir(pdf_dir, md_dir, course, corpus):
+    if pdf_dir.is_dir():
+        for pdf_file in sorted(pdf_dir.glob("*.pdf")):
+            corpus.extend(extract_pdf_chunks(pdf_file, course))
+    if md_dir.is_dir():
+        for md_file in sorted(md_dir.glob("*.md")):
+            corpus.extend(extract_md_chunks(md_file, course))
+
 
 def main():
     db_path = Path("db")
     db_path.mkdir(exist_ok=True)
     corpus = []
-    
-    pdf_dir = Path("data/reference_books")
-    if pdf_dir.exists():
-        for pdf_file in pdf_dir.glob("*.pdf"):
-            corpus.extend(extract_pdf_chunks(pdf_file))
-            
-    notes_dir = Path("data/reference_notes")
-    if notes_dir.exists():
-        for md_file in notes_dir.glob("*.md"):
-            corpus.extend(extract_md_chunks(md_file))
-            
+
+    # Shared library first (course="" keeps old consumers working).
+    index_dir(Path("data/reference_books"), Path("data/reference_notes"), "", corpus)
+
+    # Per-course libraries (matches render-html REFERENCE_DIRS).
+    courses_dir = Path("data/courses")
+    if courses_dir.is_dir():
+        for entry in sorted(courses_dir.iterdir()):
+            if entry.is_dir():
+                index_dir(entry / "reference_books", entry / "reference_notes",
+                          entry.name, corpus)
+
     with open(db_path / "index.json", "w", encoding='utf-8') as f:
         json.dump(corpus, f, indent=2)
     print(f"Indexed {len(corpus)} chunks.")
+
 
 if __name__ == "__main__":
     main()
@@ -170,41 +215,91 @@ if __name__ == "__main__":
 The AI agent uses this script to fetch context for mathematical expansions.
 
 ```python
+"""BM25 search over the local reference index.
+
+Usage:
+    uv run search-refs "Cauchy-Riemann equations"
+    uv run search-refs "functor" --top_k 5 --json
+    uv run search-refs --batch queries.txt --top_k 3
+
+--json prints machine-readable results (for scripts / batch pipelines).
+--batch runs one query per non-empty line of a file.
+"""
+
 import json
 import argparse
 import re
 from pathlib import Path
 from rank_bm25 import BM25Okapi
 
-def main():
-    parser = argparse.ArgumentParser(description="Search reference texts.")
-    parser.add_argument("query", type=str, help="Mathematical concept to search")
-    parser.add_argument("--top_k", type=int, default=3, help="Number of results")
-    args = parser.parse_args()
 
+def load_corpus():
     index_path = Path("db/index.json")
     if not index_path.exists():
-        print("Index not found. Run extract-refs first.")
-        return
-
-    with open(index_path, "r", encoding='utf-8') as f:
+        raise SystemExit("Index not found. Run extract-refs first.")
+    with open(index_path, "r", encoding="utf-8") as f:
         corpus = json.load(f)
-
     if not corpus:
-        print("Corpus is empty.")
-        return
+        raise SystemExit("Corpus is empty.")
+    return corpus
 
-    # Improved tokenizer: strips punctuation to improve BM25 matching
-    tokenized_corpus = [re.findall(r'\w+', doc["text"].lower()) for doc in corpus]
-    bm25 = BM25Okapi(tokenized_corpus)
-    
-    tokenized_query = re.findall(r'\w+', args.query.lower())
-    top_n = bm25.get_top_n(tokenized_query, corpus, n=args.top_k)
 
-    for i, doc in enumerate(top_n):
+def build_bm25(corpus):
+    tokenized_corpus = [re.findall(r"\w+", doc["text"].lower()) for doc in corpus]
+    return BM25Okapi(tokenized_corpus)
+
+
+def search(corpus, bm25, query, top_k):
+    tokenized_query = re.findall(r"\w+", query.lower())
+    return bm25.get_top_n(tokenized_query, corpus, n=top_k)
+
+
+def print_human(query, docs):
+    print(f"\n=== Query: {query} ===")
+    for i, doc in enumerate(docs):
+        course = doc.get("course", "")
+        tag = f" | Course: {course}" if course else ""
         print(f"\n--- Result {i+1} ---")
-        print(f"Source: {doc['source']} | Page: {doc['page']}")
+        print(f"Source: {doc['source']} | Page: {doc['page']}{tag}")
         print(f"Text:\n{doc['text']}\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Search reference texts.")
+    parser.add_argument("query", type=str, nargs="?", help="Mathematical concept to search")
+    parser.add_argument("--top_k", type=int, default=3, help="Number of results")
+    parser.add_argument("--json", action="store_true", help="Emit JSON instead of human text")
+    parser.add_argument("--batch", type=str, default=None, help="File with one query per line")
+    args = parser.parse_args()
+
+    queries: list[str] = []
+    if args.batch:
+        queries = [
+            line.strip()
+            for line in Path(args.batch).read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        if not queries:
+            raise SystemExit(f"ERROR: no queries in {args.batch}")
+    elif args.query:
+        queries = [args.query]
+    else:
+        raise SystemExit("ERROR: give a query or --batch <file>.")
+
+    corpus = load_corpus()
+    bm25 = build_bm25(corpus)
+
+    all_results = []
+    for q in queries:
+        docs = search(corpus, bm25, q, args.top_k)
+        if args.json:
+            all_results.append({"query": q, "results": docs})
+        else:
+            print_human(q, docs)
+
+    if args.json:
+        print(json.dumps(all_results if args.batch else all_results[0]["results"], indent=2, ensure_ascii=False))
+
 
 if __name__ == "__main__":
     main()
@@ -328,8 +423,18 @@ MATH_TOKEN_FMT = "MathZzZ{}ZzZmath"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+WARNING_COUNT = 0
+
+
 def warn(message: str) -> None:
+    global WARNING_COUNT
+    WARNING_COUNT += 1
     print(f"  WARNING: {message}")
+
+
+def reset_warnings() -> None:
+    global WARNING_COUNT
+    WARNING_COUNT = 0
 
 
 def resolve_file(name: str, dirs: tuple[Path, ...]) -> Path | None:
@@ -795,10 +900,16 @@ def main() -> None:
         action="store_true",
         help="Do not rasterize PDF pages (reuse existing output/<course>/assets)",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with code 1 when any WARNING was emitted (for CI / archive guard)",
+    )
     args = parser.parse_args()
 
     global SKIP_EXPORT
     SKIP_EXPORT = args.skip_export
+    reset_warnings()
     slug = configure(args.course)
 
     input_path = Path(args.input_file)
@@ -821,6 +932,12 @@ def main() -> None:
         handle.write(final_html)
 
     print(f"Rendered HTML saved to {output_path} (course: {slug})")
+    if WARNING_COUNT:
+        print(f"{WARNING_COUNT} warning(s) emitted.")
+        if args.strict:
+            raise SystemExit(1)
+    else:
+        print("OK: no warnings.")
 
 
 if __name__ == "__main__":

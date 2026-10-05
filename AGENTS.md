@@ -44,11 +44,11 @@ If the file is missing or names a non-existent course, list `data/courses/` and 
 Read the note files located in the active course's inbox (`data/courses/<course>/raw_notes/`) using your native multimodal vision capabilities and extract theorems, definitions, proofs, and raw equations.
 
 - **Image files (`.jpg`, `.png`, …):** view them directly. Remember which image each section came from, and estimate its **bounding box** (see "Bounding boxes" below).
-- **Scanned PDFs (`.pdf`):** export every page to PNG first so you can see them (replace `<course>` with the slug from `ACTIVE_COURSE`), e.g.:
+- **Scanned PDFs (`.pdf`):** export every page to PNG first so you can see them:
   ```bash
-  uv run python -c "import pymupdf; d=pymupdf.open('data/courses/<course>/raw_notes/01.pdf'); [p.get_pixmap(matrix=pymupdf.Matrix(2,2), alpha=False).save(f'/tmp/opencode/01_page-{i+1}.png') for i,p in enumerate(d)]"
+  uv run export-notes --course <course>   # rasterizes raw_notes/ PDFs to /tmp/opencode for viewing
   ```
-  Then view each PNG. **Track the 1-based page number** of every section you transcribe.
+  Then view each PNG. **Track the 1-based page number** of every section you transcribe. (`export-notes --list` only lists the inbox; `export-notes 01.pdf` exports one file.)
 
 **Language detection:** first determine which language the notes are written in (e.g. Italian). That language is **mandatory for the entire output** of Step 3 — headings, prose, and reference expansions alike.
 
@@ -59,18 +59,24 @@ Round to 2 decimals. If you cannot estimate reliably, omit the box — the viewe
 **Box convention (mandatory — this is where past runs failed):**
 - **Full width:** always `x=0, w=1`. The viewer draws a thin outline *inside* the rectangle, so an inset box leaves part of the line outside the highlight while its side borders can clip edge writing.
 - **Top/bottom edges in blank gaps:** the box must cover the section's *whole* height, with its top edge in the blank gap *above* the section's first ink line and its bottom edge in the blank gap *below* its last ink line — never across handwriting. A border drawn through a text line visibly strikes through the writing.
-- **How to place edges reliably:** after exporting the page PNGs, measure the ink bands (e.g. with a small script that counts dark/saturated pixels per row) and put each edge in the middle of the gap between two bands. Neighboring sections share the gap: one's bottom edge and the next one's top edge both sit inside it.
-- **Self-check:** `render-html` scans the rasterized page around every box edge and prints `WARNING: [file] box <edge> border crosses ink` when an edge hits writing — fix the coordinates and re-render until it is silent.
+- **How to place edges reliably:** run `uv run suggest-boxes <file> --page N` — it prints the ink profile, blank gaps and gap midpoints using the same ink definition as the validator. Put each edge in the middle of a gap. Neighboring sections share the gap: one's bottom edge and the next one's top edge both sit inside it. You still decide the *semantic* split (which lines form one section); the tool tells you *where the gaps are*.
+- **Self-check:** `render-html` scans the rasterized page around every box edge and prints `WARNING: [file] box <edge> border crosses ink` when an edge hits writing — fix the coordinates and re-render until it is silent (`uv run lint-md <file.md>` runs the same checks without writing HTML).
 
 ### Step 2: Mathematical Context Retrieval
 Identify logical gaps, abbreviated concepts, or sketched proofs in the handwritten mathematical notes.
 Open the terminal and execute the search utility to find formalized definitions or proofs from the reference library:
 ```bash
 uv run search-refs "Cauchy-Riemann equations"
+uv run search-refs --batch queries.txt --top_k 3 --json   # one query per line, machine-readable
 ```
-Read the standard output (it includes the **source page number** of each hit) and mentally incorporate the formal definitions and rigorous proofs found in the references to expand the abbreviated handwritten notes.
+Read the standard output (it includes the **source page number** of each hit) and mentally incorporate the formal definitions and rigorous proofs found in the references to expand the abbreviated handwritten notes. The index covers shared `data/reference_books/` plus per-course `reference_books/` (rebuilt with `uv run extract-refs`).
 
 ### Step 3: Drafting the Output (`output/<course>/notes_name.md`)
+Scaffold the file (filenames may be `NN.pdf` today and `date.jpg` tomorrow — pass the real inbox name verbatim via `--from`; you decide the mapping, the tool templates the header):
+```bash
+uv run new-lesson --lesson 2 --from 01.pdf --lang it
+uv run lint-md output/<course>/02.md [--fix]   # same checks as render, no HTML written
+```
 Write a complete Markdown document combining the transcription and the retrieved references. Adhere strictly to the following formatting contract — the renderer and the UI depend on it:
 
 **0. Document header (strict):** every lesson document starts with the course display name as the H1, followed within a couple of lines by a subtitle carrying the lesson number **in the notes' language**:
@@ -121,16 +127,18 @@ Sia $f(x)$ definita come...
 ### Step 4: Rendering
 After generating and saving the `.md` file, compile the final user interface by running:
 ```bash
-uv run render-html output/<course>/notes_name.md
+uv run render-html output/<course>/notes_name.md --strict   # exits 1 on any WARNING
+uv run verify-html output/<course>/notes_name.md            # freshness + assets + chromium hover test
 ```
 The renderer reads `ACTIVE_COURSE` itself (override with `--course <slug>` if needed). Then **verify**:
 - The command prints **no WARNING lines** (fix the `.md` and re-render if it does).
 - The output HTML exists and is **newer than `templates/layout.html` and `src/render.py`** — if you edited the template or renderer, you must re-render, otherwise the browser shows a stale build (this exact bug happened before).
-- Preview/open `output/<course>/notes_name.html` and confirm the split view works: hovering a section shows the right page and the highlight box lands on the transcribed region.
+- Preview/open `output/<course>/notes_name.html` and confirm the split view works: hovering a section shows the right page and the highlight box lands on the transcribed region. `verify-html` automates this headless (static checks always; chromium hover test when `chromium` + `puppeteer-core` are available; `--no-browser` skips it).
+- Keep `Plan.md` code in sync after touching `src/` or `templates/`: `uv run sync-docs` (fails CI with `--check` when stale). Single source of truth is the files, not the doc.
 
 ### Step 5: Archiving
-Once the rendering is complete, move the transcribed source file(s) from the course inbox to its archive so they are not processed again:
+Once the rendering is complete and verified, archive so sources are not processed again:
 ```bash
-mv data/courses/<course>/raw_notes/01.pdf data/courses/<course>/processed_notes/
+uv run archive-lesson 01.pdf --html output/<course>/01.html
 ```
-This is safe **after** rendering: the renderer resolves source paths across both of the active course's directories, so future re-renders still find the files. Inform the user that the processing is complete.
+(refuses when the HTML is missing/stale or has missing-file markers; `--force` overrides). This is safe **after** rendering: the renderer resolves source paths across both of the active course's directories, so future re-renders still find the files. Inform the user that the processing is complete.

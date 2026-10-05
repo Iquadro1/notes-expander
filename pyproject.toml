@@ -18,6 +18,13 @@ dependencies = [
 extract-refs = "src.extract:main"
 search-refs = "src.search:main"
 render-html = "src.render:main"
+export-notes = "src.export_notes:main"
+suggest-boxes = "src.suggest:main"
+new-lesson = "src.new_lesson:main"
+lint-md = "src.lint:main"
+verify-html = "src.verify:main"
+archive-lesson = "src.archive:main"
+sync-docs = "src.sync_docs:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -11,3 +11,8 @@ wheels/
 
 # Generated viewer assets (rasterized PDF pages, regenerable by render-html)
 output/*/assets/
+
+# Browser-verify screenshots + node deps (regenerable by verify-html)
+verify-shots/
+scripts/node_modules/
+pptr/node_modules/

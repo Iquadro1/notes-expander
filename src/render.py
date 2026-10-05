@@ -112,8 +112,18 @@ MATH_TOKEN_FMT = "MathZzZ{}ZzZmath"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+WARNING_COUNT = 0
+
+
 def warn(message: str) -> None:
+    global WARNING_COUNT
+    WARNING_COUNT += 1
     print(f"  WARNING: {message}")
+
+
+def reset_warnings() -> None:
+    global WARNING_COUNT
+    WARNING_COUNT = 0
 
 
 def resolve_file(name: str, dirs: tuple[Path, ...]) -> Path | None:
@@ -579,10 +589,16 @@ def main() -> None:
         action="store_true",
         help="Do not rasterize PDF pages (reuse existing output/<course>/assets)",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit with code 1 when any WARNING was emitted (for CI / archive guard)",
+    )
     args = parser.parse_args()
 
     global SKIP_EXPORT
     SKIP_EXPORT = args.skip_export
+    reset_warnings()
     slug = configure(args.course)
 
     input_path = Path(args.input_file)
@@ -605,6 +621,12 @@ def main() -> None:
         handle.write(final_html)
 
     print(f"Rendered HTML saved to {output_path} (course: {slug})")
+    if WARNING_COUNT:
+        print(f"{WARNING_COUNT} warning(s) emitted.")
+        if args.strict:
+            raise SystemExit(1)
+    else:
+        print("OK: no warnings.")
 
 
 if __name__ == "__main__":
