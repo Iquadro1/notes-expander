@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ title }}</title>
+<title>Elementi di Topologia Algebrica</title>
 <style>
   :root {
     --accent: #007bff;
@@ -156,7 +156,145 @@
 <body>
 <div class="container">
   <div class="text-pane" id="text-pane">
-    {{ html_content }}
+    <div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.0000,1.0000,0.4000"></div>
+
+<h1>Elementi di Topologia Algebrica</h1>
+<h2>Lezione 1</h2>
+<h2>Cosa faremo?</h2>
+<p>L'obiettivo è mappare spazi topologici in strutture algebriche:
+$X$ (spazio topologico) $\longrightarrow h(X)$ (insiemi, gruppi, anelli)</p>
+<p>Data una funzione continua $f: X \to Y$, associamo un morfismo:
+$h(f): h(X) \to h(Y)$ (se covariante) oppure $h(X) \leftarrow h(Y)$ (se controvariante).</p>
+<p>Tale che:</p>
+<ul>
+<li>spazi topologici equivalenti hanno insiemi/gruppi/morfismi isomorfi</li>
+<li>mappe omotope sono associate allo stesso morfismo</li>
+</ul>
+<p>Cioè costruiamo funtori da:</p>
+<ul>
+<li><strong>Top</strong> (spazi topologici) a <strong>Ab</strong> (gruppi abeliani)</li>
+<li><strong>Top_*</strong> (spazi topologici puntati) a <strong>Gr</strong> (gruppi)</li>
+</ul>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-264.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="264" data-total="584"></div>
+
+<p>In topologia algebrica, un obiettivo principale è associare invarianti algebrici (come i gruppi di omologia) agli spazi topologici. Come visto in Munkres, ciò definisce un funtore dalla categoria degli spazi topologici e delle mappe continue a una categoria algebrica come i gruppi abeliani o i complessi di catene, garantendo che spazi omeomorfi (o omotopicamente equivalenti) diano gruppi isomorfi.</p>
+<hr />
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.4000,1.0000,0.3960"></div>
+
+<h2>Categorie e Funtori</h2>
+<h3>Definizione (Categoria)</h3>
+<p>Una categoria $C$ è il dato di:
+(a) una classe di oggetti $ob(C)$
+(b) per ogni coppia di oggetti $(X,Y)$ ho un insieme $hom(X,Y)$ di morfismi con "dominio" $X$ e "codominio" $Y$
+(c) per ogni tripla $X, Y, Z$ di $ob(C)$ ho un morfismo "composizione"
+$$hom(X,Y) \times hom(Y,Z) \longrightarrow hom(X,Z)$$
+$$(f: X \to Y, g: Y \to Z) \longmapsto (g \circ f: X \to Z)$$
+tale che sia associativa, con identità: $\forall Y \exists 1_Y \in hom(Y,Y)$ t.c. $f = 1_Y \circ f, g \circ 1_Y = g$.</p>
+<p>Non è detto che gli oggetti siano insiemi e i morfismi funzioni.</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.7960,1.0000,0.0710"></div>
+
+<h3>Definizione (Categoria piccola)</h3>
+<p>Se $ob(C)$ è un insieme, la categoria si dice <strong>piccola</strong>.</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.8670,1.0000,0.1330"></div>
+
+<h3>Esempi di Categorie</h3>
+<p><strong>Top</strong>, <strong>Top_*</strong>, <strong>Grp</strong>, <strong>Ab</strong>, <strong>R</strong>, <strong>Insiemi</strong> (con funzioni, funzioni iniettive, funzioni suriettive).</p>
+<p>Posso prendere $X$ insieme parzialmente ordinato (poset) e definire:
+$$
+hom(x,x') = \begin{cases} 
+(x,x') &amp; \text{se } x \leq x' \\ 
+\emptyset &amp; \text{altrimenti} 
+\end{cases}
+$$</p>
+<hr />
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.0150,1.0000,0.1580"></div>
+
+<h3>Definizione (Funtore)</h3>
+<p>Date due categorie $C$ e $D$ un funtore covariante/controvariante $T$ da $C$ a $D$ è una funzione che: a ogni coppia $X \in ob(C)$ associa $T(X) \in ob(D)$ e a ogni morfismo $f: X \to Y$ di $C$ associa $T(f): T(X) \to T(Y)$ (covariante) o $T(Y) \to T(X)$ (controvariante) tale che $T$ rispetta identità e composizione.</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.1730,1.0000,0.0670"></div>
+
+<h3>Definizione (Equivalenze)</h3>
+<p>Morfismi che hanno inversa destra e sinistra sono detti <strong>equivalenze</strong>.</p>
+<hr />
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.2400,1.0000,0.2490"></div>
+
+<h2>Complessi Algebrici</h2>
+<p>Considero $R$ anello (commutativo con identità) e la categoria $M_R^\mathbb{Z}$ degli $R$-moduli graduati.</p>
+<ul>
+<li><strong>oggetti</strong>: $M \in M_R^\mathbb{Z}$ è $M = \{M_n\}_{n \in \mathbb{Z}}$ con $M_i$ $R$-moduli.</li>
+<li><strong>morfismi</strong>: $\varphi: M \to M'$ di grado $p$ è la famiglia $\{\varphi_n: M_n \to M'_{n+p} \text{ morfismo di } R\text{-mod}\}$.</li>
+</ul>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.4890,1.0000,0.1620"></div>
+
+<h3>Definizione (Complesso di catene)</h3>
+<p>Un complesso di catene $C = \{C_n, \partial_n\}$ su $R$ è un oggetto di $M_R^\mathbb{Z}$ con un morfismo $\partial$ di grado -1: $\partial: C \to C$, $\partial^2 = 0$.
+$$ \dots \leftarrow C_{-1} \xleftarrow{\partial_0} C_0 \xleftarrow{\partial_1} C_1 \xleftarrow{\partial_2} C_2 \leftarrow \dots $$
+$\partial_n \circ \partial_{n+1} = 0$, $\partial$ è detta mappa di bordo.</p>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-292.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="292" data-total="584"></div>
+
+<p>Come formalizzato in Munkres, un complesso di catene $C = \{C_p, \partial_p\}$ è costituito dai gruppi $C_p$ e dagli operatori di bordo $\partial_p : C_p \to C_{p-1}$ che soddisfano la condizione fondamentale $\partial_{p-1} \circ \partial_p = 0$. Ne consegue che l'immagine di un operatore di bordo è sempre contenuta nel nucleo del successivo.</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.6510,1.0000,0.1400"></div>
+
+<h3>Definizione (Morfismo di complessi)</h3>
+<p>Un morfismo di complessi $\varphi: C \to C'$ è un morfismo in $M_R^\mathbb{Z}$ di grado 0 tale che commuta con le mappe di bordo $\partial$.</p>
+<p><em>Osservazione:</em> poiché $\partial^2 = 0 \implies \ker \partial_n \supseteq \text{Im } \partial_{n+1}$.</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.7910,1.0000,0.2090"></div>
+
+<h3>Definizione (Omologia)</h3>
+<p>$$H_n(C) = \frac{\ker \partial_n}{\text{Im } \partial_{n+1}}$$
+è detto $n$-esimo gruppo di omologia di $C$, con $H_*(C) = \{H_n(C)\}$.</p>
+<p>Un morfismo di complessi $f: C \to D$ induce $H(f): H_*(C) \to H_*(D)$ definito da:
+$$[c] \longmapsto [f_n(c)]$$
+$H(f)$ è ben definito: se $[c] = [c'] \implies c' = c + \partial_{n+1}\xi$, allora:</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.0000,1.0000,0.1560"></div>
+
+<p>$$f_n(c') = f_n(c) + f_n \partial_{n+1} \xi = f_n(c) + \partial'_{n+1} f_{n+1} \xi \implies [f_n(c)] = [f_n(c')]$$</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.1560,1.0000,0.2380"></div>
+
+<p>Quindi l'omologia $H(-)$ è un funtore dalla categoria di complessi di catene a quelle degli $R$-moduli graduati.</p>
+<p><strong>Notazione:</strong></p>
+<ul>
+<li>elementi in $C_n$ si dicono <strong>"n-catene"</strong></li>
+<li>elementi in $\ker \partial_n = Z_n(C)$ si dicono <strong>"n-cicli"</strong></li>
+<li>elementi in $\text{Im } \partial_{n+1} = B_n(C)$ si dicono <strong>"n-bordi"</strong></li>
+</ul>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-561.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="561" data-total="584"></div>
+
+<p>Munkres adotta questa notazione in modo rigoroso, definendo $Z_p(C)$ come il gruppo dei cicli/cocicli (nucleo) e $H_p(C)$ come il gruppo di omologia del complesso di catene.</p>
+<hr />
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.3940,1.0000,0.2000"></div>
+
+<h3>Definizione (Complesso di co-catene e co-omologia)</h3>
+<p>Un complesso di co-catene è $C = \{C^n, \delta^n\}$ con differenziale $\delta^n: C^n \to C^{n+1}$ di grado +1 t.c. $\delta^2 = 0$.
+Il differenziale $\delta$ si chiama <strong>cobordo</strong>.
+Gli elementi di $C^n$ si chiamano <strong>cocatene</strong>.
+$$H(C) = \{H^n(C)\} \quad \text{con} \quad H^n(C) = \frac{\ker \delta^n}{\text{Im } \delta^{n-1}}$$
+prende il nome di <strong>co-omologia</strong>.</p>
+<hr />
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.5940,1.0000,0.1010"></div>
+
+<h2>Successioni Esatte</h2>
+<p>Dati 3 complessi di catene $A$, $B$ e $C$, la successione di morfismi $0 \to A \xrightarrow{\varphi} B \xrightarrow{\psi} C \to 0$ si dice esatta se lo sono le successioni $0 \to A_n \xrightarrow{\varphi_n} B_n \xrightarrow{\psi_n} C_n \to 0 \ \forall n$.</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.6950,1.0000,0.3050"></div>
+
+<h3>Teorema</h3>
+<p>Data $0 \to A \xrightarrow{\varphi} B \xrightarrow{\psi} C \to 0$ esatta di complessi di catene (co-catene) esiste un morfismo di grado -1 (+1) $\omega: H(C) \to H(A)$ tale che abbiamo la successione esatta lunga:
+$$ \dots \to H_n(A) \xrightarrow{\varphi_*} H_n(B) \xrightarrow{\psi_*} H_n(C) \xrightarrow{\omega} H_{n-1}(A) \xrightarrow{\varphi_*} H_{n-1}(B) \to \dots $$
+cioè il triangolo $H(A) \xrightarrow{\varphi_*} H(B) \xrightarrow{\psi_*} H(C) \xrightarrow{\omega} H(A)$ è esatto.</p>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-177.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="177" data-total="584"></div>
+
+<p>Munkres costruisce formalmente il risultato dimostrando che ogni successione esatta corta di complessi di catene induce una successione esatta lunga di gruppi di omologia; la dimostrazione si basa fortemente sul diagram chasing.</p>
+<div class="sync-marker" data-title="01.pdf" data-kind="pages" data-base="assets/01/page" data-count="4" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/processed_notes/01.pdf" data-box="0.0000,0.0150,1.0000,0.3600"></div>
+
+<h3>Dimostrazione</h3>
+<p>Si tratta di fare diagram chasing sul seguente diagramma:</p>
+<p>Sia $\gamma \in Z_n(C)$ un ciclo (cioè $\partial\gamma = 0$), vogliamo definire $\omega([\gamma])$. 
+Per esattezza $\psi_n$ è suriettiva, dunque esiste $\beta \in B_n$ tale che $\psi_n(\beta) = \gamma$. 
+Per commutatività $\psi_{n-1}(\partial\beta) = \partial\gamma = 0$, cioè $\partial\beta \in \ker(\psi_{n-1}) = \text{Im}(\varphi_{n-1})$. 
+Dunque esiste $\alpha \in A_{n-1}$ tale che $\varphi_{n-1}(\alpha) = \partial\beta$, da cui per commutatività abbiamo che:
+$$\varphi_{n-2}(\partial\alpha) = \partial\varphi_{n-1}(\alpha) = \partial^2\beta = 0$$
+cioè $\alpha \in Z_{n-1}(A)$, dato che $\varphi_{n-2}$ è iniettiva. Poniamo $\omega([\gamma]) = [\alpha]$.</p>
+<p>Bisognerebbe verificare che la definizione non dipende dalle scelte di $\gamma$ e $\beta$ nelle rispettive classi, e poi che la successione così ottenuta è esatta. Per il momento non riportiamo queste verifiche. $\square$</p>
   </div>
   <div class="viewer-pane">
     <div class="viewer-container" id="viewer-container">

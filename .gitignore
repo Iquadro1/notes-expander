@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Generated viewer assets (rasterized PDF pages, regenerable by render-html)
+output/*/assets/
