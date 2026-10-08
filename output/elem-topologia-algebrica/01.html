@@ -13,7 +13,7 @@
   .container { display: flex; height: 100vh; overflow: hidden; }
 
   /* ---- Left pane: transcribed / rewritten notes ---- */
-  .text-wrap { width: 50%; position: relative; display: flex; min-height: 0; }
+  .text-wrap { flex: 0 0 50%; min-width: 0; position: relative; display: flex; min-height: 0; }
   .text-pane { flex: 1 1 auto; width: 100%; padding: 2rem; overflow-y: auto; box-sizing: border-box; font-size: 1.05rem; }
   .content-section {
     padding: 0.75rem 1.25rem;
@@ -31,7 +31,8 @@
 
   /* ---- Right pane: source viewer ---- */
   .viewer-pane {
-    width: 50%;
+    flex: 1 1 auto;
+    min-width: 0;
     background: #eceff1;
     padding: 1.5rem;
     box-sizing: border-box;
@@ -95,6 +96,29 @@
     from { box-shadow: 0 0 0 rgba(0, 123, 255, 0); }
     to   { box-shadow: 0 0 12px rgba(0, 123, 255, 0.6); }
   }
+
+  /* Draggable split divider between the two panes */
+  #splitter {
+    flex: 0 0 8px;
+    cursor: col-resize;
+    background: #dee2e6;
+    position: relative;
+    touch-action: none;
+    transition: background 0.15s ease;
+  }
+  #splitter::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 2.5rem;
+    border-radius: 2px;
+    background: #adb5bd;
+  }
+  #splitter:hover, #splitter.dragging { background: var(--accent-soft); }
+  #splitter:hover::after, #splitter.dragging::after { background: var(--accent); }
 
   /* Floating per-pane zoom buttons (same steps as Ctrl+wheel) */
   .zoom-bar {
@@ -336,6 +360,7 @@ cioè $\alpha \in Z_{n-1}(A)$, dato che $\varphi_{n-2}$ è iniettiva. Poniamo $\
       <button id="text-zoom-reset" title="Reset notes zoom">⟲</button>
     </div>
   </div>
+  <div id="splitter" title="Drag to resize panes"></div>
   <div class="viewer-pane">
     <div class="viewer-container" id="viewer-container">
       <div class="img-wrap" id="img-wrap">
@@ -428,6 +453,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const textZoomOut = document.getElementById('text-zoom-out');
   const textZoomReset = document.getElementById('text-zoom-reset');
   const textZoomLevel = document.getElementById('text-zoom-level');
+  const textWrap = document.querySelector('.text-wrap');
+  const splitContainer = document.querySelector('.container');
+  const splitter = document.getElementById('splitter');
 
   const view = { key: '', kind: 'none', base: '', count: 0, page: 1, file: '', box: null, boxPage: 0 };
 
@@ -727,6 +755,36 @@ document.addEventListener('DOMContentLoaded', () => {
     viewerPane.addEventListener('mouseenter', () => container.classList.add('active-view'));
     viewerPane.addEventListener('mouseleave', () => container.classList.remove('active-view'));
   }
+
+  /* ---------------------------------------------------------------
+   * 6. Draggable split divider: drag to widen one pane at the expense
+   *    of the other (clamped 15-85%); double-click resets to 50/50.
+   * ------------------------------------------------------------- */
+  let splitting = false;
+  splitter.addEventListener('pointerdown', (e) => {
+    splitting = true;
+    splitter.classList.add('dragging');
+    try { splitter.setPointerCapture(e.pointerId); } catch (_) {}
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  splitter.addEventListener('pointermove', (e) => {
+    if (!splitting) return;
+    const rect = splitContainer.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const pct = Math.min(85, Math.max(15, (e.clientX - rect.left) / rect.width * 100));
+    textWrap.style.flexBasis = pct.toFixed(2) + '%';
+  });
+  function endSplit() {
+    splitting = false;
+    splitter.classList.remove('dragging');
+    document.body.style.userSelect = '';
+  }
+  splitter.addEventListener('pointerup', endSplit);
+  splitter.addEventListener('pointercancel', endSplit);
+  splitter.addEventListener('dblclick', () => {
+    textWrap.style.flexBasis = '50%';
+  });
 
   hideAll();
   const first = wrappers.find(w => w.dataset.kind && w.dataset.kind !== 'none') || wrappers[0];
