@@ -130,22 +130,6 @@
   .pane-msg { color: #6c757d; text-align: center; padding: 1.5rem; max-width: 32rem; }
   .pane-msg.warning { color: #c0392b; }
 
-  .open-doc {
-    position: absolute;
-    top: 0.6rem;
-    right: 0.8rem;
-    display: none;
-    font-size: 0.8rem;
-    color: var(--accent);
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 0.2rem 0.55rem;
-    text-decoration: none;
-    z-index: 2;
-  }
-  .open-doc:hover { text-decoration: underline; }
-
   #page-nav {
     position: absolute;
     bottom: 0.6rem;
@@ -369,7 +353,6 @@ cioè $\alpha \in Z_{n-1}(A)$, dato che $\varphi_{n-2}$ è iniettiva. Poniamo $\
         <span id="page-label">1 / 1</span>
         <button id="next-page" title="Next page">&#8250;</button>
       </div>
-      <a id="open-doc" class="open-doc" href="#" target="_blank" rel="noopener">Open document</a>
       <div class="zoom-bar" id="img-zoom" title="Zoom source image">
         <button id="img-zoom-out" title="Zoom out image">−</button>
         <span class="zoom-level" id="img-zoom-level">100%</span>
@@ -431,7 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const prevBtn = document.getElementById('prev-page');
   const nextBtn = document.getElementById('next-page');
   const pageLabel = document.getElementById('page-label');
-  const openLink = document.getElementById('open-doc');
   const chip = document.getElementById('ref-viewer-text');
   const container = document.getElementById('viewer-container');
   const viewerPane = document.querySelector('.viewer-pane');
@@ -500,7 +482,6 @@ document.addEventListener('DOMContentLoaded', () => {
     linkState.style.display = 'none';
     box.style.display = 'none';
     nav.classList.remove('visible');
-    openLink.style.display = 'none';
   }
 
   function setBox() {
@@ -524,10 +505,6 @@ document.addEventListener('DOMContentLoaded', () => {
     pageLabel.textContent = view.page + ' / ' + view.count;
     prevBtn.disabled = view.page <= 1;
     nextBtn.disabled = view.page >= view.count;
-    if (view.file) {
-      openLink.href = view.file + '#page=' + view.page;
-      openLink.style.display = 'inline';
-    }
     setBox();
     applyImgZoom();
   }
@@ -584,8 +561,6 @@ document.addEventListener('DOMContentLoaded', () => {
         img.style.display = 'block';
         setBox();
         chipText(side, d.title, ' - page ' + view.page + ' / ' + (d.total || '?'));
-        openLink.href = view.file + '#page=' + view.page;
-        openLink.style.display = view.file ? 'inline' : 'none';
         break;
       }
       case 'pages': {
@@ -611,8 +586,6 @@ document.addEventListener('DOMContentLoaded', () => {
         view.box = null;
         if (obj.getAttribute('data') !== d.file) obj.setAttribute('data', d.file);
         obj.style.display = 'block';
-        openLink.href = d.file;
-        openLink.style.display = 'inline';
         chipText(side, d.title);
         break;
       }
@@ -668,9 +641,9 @@ document.addEventListener('DOMContentLoaded', () => {
   nextBtn.addEventListener('click', () => setPage(view.page + 1));
 
   /* ---------------------------------------------------------------
-   * 5. Per-pane zoom + cursor-driven frame. Page nav, open-doc link,
-   *    hover sync and box overlay are unchanged; the old flash-on-hover
-   *    is gone, the frame now follows the cursor side.
+   * 5. Per-pane zoom + cursor-driven frame. Page nav, click-to-open
+   *    overlay, hover sync and box overlay are unchanged; the old
+   *    flash-on-hover is gone, the frame now follows the cursor side.
    * ------------------------------------------------------------- */
   // Left pane: Ctrl+wheel scales the transcribed-notes font.
   textPane.addEventListener('wheel', (e) => {
