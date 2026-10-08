@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elementi di Topologia Algebrica</title>
+<style>
+  :root {
+    --accent: #007bff;
+    --accent-soft: rgba(0, 123, 255, 0.18);
+  }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; background: #fff; }
+  .container { display: flex; height: 100vh; overflow: hidden; }
+
+  /* ---- Left pane: transcribed / rewritten notes ---- */
+  .text-pane { width: 50%; padding: 2rem; overflow-y: auto; box-sizing: border-box; font-size: 1.05rem; }
+  .content-section {
+    padding: 0.75rem 1.25rem;
+    margin: 0.75rem 0;
+    border-radius: 8px;
+    border-left: 4px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: default;
+  }
+  .content-section.active {
+    background: #f5f9ff;
+    border-left-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  /* ---- Right pane: source viewer ---- */
+  .viewer-pane {
+    width: 50%;
+    background: #eceff1;
+    padding: 1.5rem;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .viewer-container {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: box-shadow 0.3s ease;
+  }
+  .viewer-container.flash {
+    box-shadow: 0 0 0 4px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  .viewer-el { display: none; }
+  #viewer-obj { width: 100%; height: 100%; border: none; }
+
+  /* Image sized to its natural box so the overlay's % coords match the page */
+  .img-wrap { position: relative; display: flex; max-width: 100%; }
+  #viewer-img { display: block; max-width: 100%; max-height: calc(100vh - 11rem); object-fit: contain; }
+
+  .box-overlay {
+    position: absolute;
+    display: none;
+    /* border-box: the md's x,y,w,h IS the outer rectangle, so the border
+       stays where the agent placed it. Kept thin (2px) so a highlight
+       border never eats the handwriting at the edge of a line. */
+    box-sizing: border-box;
+    border: 2px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    pointer-events: none;
+    animation: boxpulse 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes boxpulse {
+    from { box-shadow: 0 0 0 rgba(0, 123, 255, 0); }
+    to   { box-shadow: 0 0 12px rgba(0, 123, 255, 0.6); }
+  }
+
+  .pane-msg { color: #6c757d; text-align: center; padding: 1.5rem; max-width: 32rem; }
+  .pane-msg.warning { color: #c0392b; }
+
+  .open-doc {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.8rem;
+    display: none;
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0.2rem 0.55rem;
+    text-decoration: none;
+    z-index: 2;
+  }
+  .open-doc:hover { text-decoration: underline; }
+
+  #page-nav {
+    position: absolute;
+    bottom: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: 0.6rem;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #dee2e6;
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+  #page-nav.visible { display: flex; }
+  #page-nav button {
+    border: 1px solid #ced4da;
+    background: #fff;
+    border-radius: 6px;
+    width: 1.8rem;
+    height: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #page-nav button:disabled { opacity: 0.35; cursor: default; }
+  #page-nav a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+  #page-nav a:hover { text-decoration: underline; }
+
+  .ref-text {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    background: #fff;
+    border-radius: 8px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-left: 4px solid #6c757d;
+    overflow-wrap: anywhere;
+  }
+  .ref-text.source { border-left-color: #28a745; }
+  .ref-text.reference { border-left-color: #ffc107; }
+  .ref-text.missing { border-left-color: #dc3545; color: #dc3545; }
+
+  /* Markers are structural only; never visible */
+  .sync-marker { display: none; }
+</style>
+<script>
+  MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+<div class="container">
+  <div class="text-pane" id="text-pane">
+    <div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0000,1.0000,0.1116"></div>
+
+<h1>Elementi di Topologia Algebrica</h1>
+<h2>Lezione 2</h2>
+<h2>Omotopia di complessi di catene</h2>
+<p>Riprendiamo i complessi di catene $C\_* = \{C_n, \partial_n\}$ e il gruppo di omologia $H_i(C\_*) = \ker \partial_i / \operatorname{Im} \partial_{i+1}$.</p>
+<p>Una successione esatta corta $0 \to A\_* \to B\_* \to C\_* \to 0$ induce la successione esatta lunga in omologia:
+$$ 0 \to H_i(A\_*) \longrightarrow H_i(B\_*) \longrightarrow H_i(C\_*) \longrightarrow H_{i-1}(A\_*) \to \dots $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.1116,1.0000,0.0974"></div>
+
+<p>Se $f: C\_* \longrightarrow D\_*$ è un morfismo di complessi, in ogni grado ho un quadrato commutativo:
+$$
+\begin{array}{ccc}
+C_n &amp; \xrightarrow{f_n} &amp; D_n \\
+\downarrow{\partial} &amp; &amp; \downarrow{\partial} \\
+C_{n-1} &amp; \xrightarrow{f_{n-1}} &amp; D_{n-1}
+\end{array}
+$$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.3902,1.0000,0.2792"></div>
+
+<h3>Definizione (Omotopia di complessi)</h3>
+<p>Un'omotopia di complessi di catene $(C\_*, \partial^C)$, $(D\_*, \partial^D)$ è un morfismo $s: C\_* \longrightarrow D\_*$ di grado $+1$ che commuta con i bordi secondo lo schema con frecce diagonali $s_n: C_n \to D_{n+1}$:
+$$
+\begin{array}{ccccc}
+\dots &amp; C_{n+1} &amp; C_n &amp; C_{n-1} &amp; \dots \\
+&amp; \searrow{s_n} &amp; \searrow{s_{n-1}} &amp; &amp; \\
+\dots &amp; D_{n+1} &amp; D_n &amp; D_{n-1} &amp; \dots
+\end{array}
+$$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.6694,1.0000,0.1570"></div>
+
+<p>Due morfismi $f, g: C\_* \longrightarrow D\_*$ sono omotopi se esiste $s$ tale che:
+$$ g - f = \partial^D_n s_n + s_{n-1} \partial^C_n. $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.7326,1.0000,0.1570"></div>
+
+<h3>Proposizione</h3>
+<p>Se $f, g$ sono omotopi allora il morfismo indotto in omologia coincide: $H_n(f) = H_n(g)$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="1" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.8264,1.0000,0.1459"></div>
+
+<h3>Dimostrazione</h3>
+<p>Dato un ciclo $z \in Z_n(C)$ (quindi $\partial z = 0$) abbiamo:
+$$ (g - f)(z) = \partial s(z) + s(\partial z) = \partial s(z), $$
+dunque $g(z) - f(z)$ è un bordo, cioè i due sono omologhi. $\square$</p>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-101.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="101" data-total="584"></div>
+
+<p>Come formalizzato in Munkres, se due morfismi di complessi sono omotopi per catene allora inducono lo stesso omomorfismo in omologia: l'omotopia $s$ di grado $+1$ realizza esplicitamente la differenza $g - f$ come bordo.</p>
+<hr />
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0000,1.0000,0.1381"></div>
+
+<h2>Simplessi geometrici</h2>
+<p>Fin qui note di Moutona; da qui seguono le note di Salvetti.</p>
+<h3>Definizione (Combinazione affine)</h3>
+<p>Una combinazione affine è, dati punti $P_0, \dots, P_n \in \mathbb{R}^N$,
+$$ \sum_{i=0}^n \lambda_i P_i \quad \text{con} \quad \sum_i \lambda_i = 1. $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.1381,1.0000,0.1453"></div>
+
+<h3>Definizione (Combinazione convessa)</h3>
+<p>Una combinazione convessa è, dati punti $P_0, \dots, P_n \in \mathbb{R}^N$,
+$$ \sum_{i=0}^n \lambda_i P_i \quad \text{con} \quad \sum_i \lambda_i = 1, \ \lambda_i \geq 0. $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.2834,1.0000,0.1304"></div>
+
+<h3>Definizione (Involucro convesso)</h3>
+<p>$$ \operatorname{conv}(P_0, \dots, P_n) = \{\sum_i \lambda_i P_i, \ \sum_i \lambda_i = 1, \ \lambda_i \geq 0\} = [P_0, \dots, P_n] $$
+è convesso in $\mathbb{R}^N$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.4138,1.0000,0.1003"></div>
+
+<h3>Definizione (Baricentro)</h3>
+<p>$$ \text{BARICENTRO: } \sum_{i=0}^n \frac{1}{n+1} P_i. $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.4593,1.0000,0.1794"></div>
+
+<h3>Definizione ($n$-simplesso geometrico)</h3>
+<p>Un $n$-simplesso (geometrico) è un $\sigma = [P_0, \dots, P_n]$, con $P_i$ affinemente indipendenti:</p>
+<ul>
+<li>$\dim \sigma = n$,</li>
+<li>vertici $= \{P_0, \dots, P_n\} = V(\sigma)$.</li>
+</ul>
+<p>Una faccia di $\sigma$ è $\tau = [P_{i_0}, \dots, P_{i_k}]$, $k$-simplesso (o $k$-faccia) di $\sigma$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.6387,1.0000,0.0915"></div>
+
+<p>Le $1$-facce sono lati, le $0$-facce sono i vertici. Facce improprie: $\emptyset, \sigma$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.6824,1.0000,0.1777"></div>
+
+<h3>Bordo e interno</h3>
+<p>$$ \operatorname{Bd} \sigma = \bigcup_{\tau \text{ faccia propria}} \tau = \{x \mid x = \sum \lambda_i p_i \text{ con qualche } \lambda_i = 0\}, $$
+$$ \operatorname{Int}(\sigma) = \sigma \setminus \operatorname{Bd} \sigma = \{x \mid x = \sum \lambda_i p_i \text{ con } \lambda_i &gt; 0 \ \forall i\}. $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="2" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.8247,1.0000,0.1635"></div>
+
+<h3>Osservazione</h3>
+<p>$\forall x \in \sigma$, $\exists!$ faccia $\tau$ di $\sigma$ tale che $x \in \operatorname{Int}(\tau)$ (la faccia è esattamente quella individuata dai vertici dove i $\lambda_i$ sono $\neq 0$).</p>
+<h3>Esercizio (da fare)</h3>
+<p>$\sigma$ $n$-simplesso: esiste un omeomorfismo $\sigma \longrightarrow \bar{B}^n$ (disco chiuso) che manda $\operatorname{Bd} \sigma$ in $\partial \bar{B}^n = S^{n-1}$.</p>
+<hr />
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0000,1.0000,0.1198"></div>
+
+<h3>Bordo e sfera</h3>
+<p>$\operatorname{Bd} \sigma$ va in $\partial \bar{B}^n = S^{n-1}$ (idea in figura: il bordo del simplesso è una sfera).</p>
+<h3>Osservazione</h3>
+<p>Prendiamo $\sigma = [P_0, \dots, P_n]$, $\sigma' = [P'_0, \dots, P'_n]$ con la topologia di sottospazio: allora $\sigma, \sigma'$ sono omeomorfi. Quindi due simplessi della stessa dimensione sono omeomorfi, e l'omeomorfismo manda facce in facce della stessa dimensione (tramite l'affinità $\sum \lambda_i P_i \longmapsto \sum \lambda_i P'_i$).</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0791,1.0000,0.2084"></div>
+
+<p>Quindi ogni $n$-simplesso è omeomorfo al simplesso standard:
+$$ \Delta^n = [E_0, \dots, E_n]. $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.4174,1.0000,0.1871"></div>
+
+<h3>Definizione (Complesso simpliciale geometrico)</h3>
+<p>Un complesso simpliciale (geometrico) è una collezione $K$ di simplessi (in $\mathbb{R}^N$) tale che:</p>
+<ol>
+<li>$\sigma \in K \implies$ ogni faccia di $\sigma \in K$;</li>
+<li>$\sigma, \sigma' \in K \implies \sigma \cap \sigma'$ è una faccia in comune.</li>
+</ol>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.5691,1.0000,0.2143"></div>
+
+<p>Esempio: $K = \{\sigma \text{ e tutte le sue facce}\}$.</p>
+<h3>Definizione (Dimensione e sottocomplessi)</h3>
+<p>$\dim K = \max_{\sigma \in K} \{\dim \sigma\}$; $K_0 = $ vertici di $K$.</p>
+<p>Un sottocomplesso $L \subseteq K$ verifica (1) (e quindi anche (2)).</p>
+<h3>Definizione ($m$-scheletro)</h3>
+<p>$K$ complesso simpliciale geometrico: l'$m$-scheletro di $K$ è $K_m = \{\sigma \in K : \dim \sigma \leq m\}$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.7368,1.0000,0.1381"></div>
+
+<h3>Definizione (Supporto)</h3>
+<p>$$ |K| = \bigcup_{\sigma \in K} \sigma \quad \text{supporto di } K. $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="3" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.8329,1.0000,0.1671"></div>
+
+<p>Consideriamo la topologia (debole): $C \subseteq |K|$ è chiuso $\iff C \cap \sigma$ è chiuso $\forall \sigma \in K$.</p>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-32.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="32" data-total="584"></div>
+
+<p>In Munkres un complesso simpliciale geometrico è definito proprio tramite le due condizioni di chiusura per facce e intersezione in facce comuni; una realizzazione geometrica di un complesso astratto è determinata a meno di isomorfismo lineare.</p>
+<hr />
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0000,1.0000,0.0785"></div>
+
+<p>$C \subseteq |K|$ è chiuso $\iff C \cap \sigma$ è chiuso $\forall \sigma \in K$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0195,1.0000,0.2509"></div>
+
+<h3>Osservazione</h3>
+<p>Se $K$ è finito allora la topologia debole coincide con la topologia di sottospazio di $\mathbb{R}^N$.</p>
+<p>Se $K$ è infinito può non avere la topologia di sottospazio: ad esempio $K_0 = \{\frac{1}{n}\} \cup \{0\}$, $K_1 = \{[\frac{1}{n+1}, \frac{1}{n}]\}$.</p>
+<h3>Esercizio</h3>
+<p>$L \subseteq K$ sottocomplesso $\implies |L| \subseteq |K|$ è chiuso in $|K|$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.2220,1.0000,0.0944"></div>
+
+<h3>Esercizio</h3>
+<p>$K$ complesso simpliciale geometrico, $f: |K| \longrightarrow X$ spazio topologico: $f$ è continua $\iff f|_{\sigma}: \sigma \longrightarrow X$ è continua $\forall \sigma$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.2704,1.0000,0.1434"></div>
+
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.4138,1.0000,0.1907"></div>
+
+<h2>Coordinate baricentriche</h2>
+<p>$\forall x \in |K|$, $\exists!$ simplesso $\sigma \in K$ tale che $x \in \operatorname{Int}(\sigma)$.</p>
+<p>Se $\sigma = [P_0, \dots, P_n]$, $x = \sum \lambda_i P_i$ con $\lambda_i &gt; 0$, poniamo:
+$$ \lambda_{P_i}(x) = \lambda_i \ \text{ se } P_i \in V(\sigma), \qquad \lambda_P(x) = 0 \ \text{ se } P \in K_0 \setminus V(\sigma). $$</p>
+<p>Quindi $\forall x \in |K|$ le coordinate baricentriche di $x$ sono $\lambda_P(x)$, $\forall P \in K_0$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.5726,1.0000,0.2704"></div>
+
+<p>Osservazione: $\forall P \in K_0$, $\lambda_P: |K| \longrightarrow \mathbb{R}$ è continua (perché è continua su ogni $\sigma$).</p>
+<p>Esempio: $\{\lambda_P(x) &gt; \frac{1}{2}\}$ individua un intorno del vertice $P$ (regione tratteggiata in figura).</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="4" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.8430,1.0000,0.1446"></div>
+
+<h3>Esercizi</h3>
+<ol>
+<li>$|K|$ è Hausdorff;</li>
+<li>$K$ finito $\implies |K|$ compatto (unione finita di compatti è compatta);</li>
+<li>$A \subseteq |K|$ compatto $\implies \exists L \subseteq K$ sottocomplesso finito tale che $A \subseteq |L|$.</li>
+</ol>
+<hr />
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="5" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0000,1.0000,0.1706"></div>
+
+<h3>Definizione (Stella)</h3>
+<p>Dato $v \in K_0$, la stella di $v$ è:
+$$ \operatorname{St}(v) = \bigcup_{v \in \sigma} \operatorname{Int}(\sigma) = \{x \in |K| \mid \lambda_v(x) &gt; 0\} $$
+(è un intorno di $v$).</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="5" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.1251,1.0000,0.1251"></div>
+
+<h3>Definizione (Stella chiusa)</h3>
+<p>$$ \overline{\operatorname{St}}(v) = \bigcup_{v \in \sigma} \sigma $$
+è il supporto del complesso simpliciale dato dalle facce dei simplessi contenenti $v$.</p>
+<h3>Definizione (Link)</h3>
+<p>$$ \operatorname{Lk}(v) = \overline{\operatorname{St}}(v) \setminus \operatorname{St}(v). $$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="5" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.3094,1.0000,0.2644"></div>
+
+<h3>Definizione (Applicazione simpliciale)</h3>
+<p>$f: |K| \longrightarrow |L|$ è un'applicazione simpliciale se:
+(i) $f(K_0) \subseteq L_0$;
+(ii) $\sigma = [v_0, \dots, v_n] \in K \implies [f(v_0), \dots, f(v_n)]$ è un simplesso di $L$ (non è detto che $f$ sia iniettiva, quindi ci possono essere ripetizioni: ad esempio $[A, B, B] = [A, B]$ e il triangolo $[A,B,C]$ può collassare sul segmento $[A',B']$);
+(iii) $x = \sum \lambda_i v_i \implies f(x) = \sum \lambda_i f(v_i)$, cioè $f|_{\sigma}$ è affine.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="5" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.5390,1.0000,0.1753"></div>
+
+<h3>Osservazione</h3>
+<p>Se $f_0: K_0 \longrightarrow L_0$ è tale che $[v_0, \dots, v_n] \in K \implies f(v_0), \dots, f(v_n)$ generano un simplesso in $L$, allora $f_0$ si estende in modo unico a un'applicazione simpliciale $f: |K| \to |L|$. Quindi ogni applicazione simpliciale è determinata da dove manda i vertici.</p>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-110.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="110" data-total="584"></div>
+
+<p>Munkres formula la condizione star per le approssimazioni simpliciali: un'applicazione continua $h$ ammette un'approssimazione simpliciale quando la controimmagine delle stelle verifica la condizione sulle stelle, a meno di suddivisione.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="5" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.8601,1.0000,0.1281"></div>
+
+<h3>Proposizione (ovvia)</h3>
+<p>$f: |K| \longrightarrow |L|$ simpliciale $\implies f$ continua.</p>
+<hr />
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="6" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0000,1.0000,0.0980"></div>
+
+<h3>Definizione (Isomorfismo simpliciale)</h3>
+<p>Un isomorfismo simpliciale è una corrispondenza biunivoca fra i vertici tale che $[v_0, \dots, v_n] \in K \iff [f(v_0), \dots, f(v_n)] \in L$ (è un omeomorfismo).</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="6" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0620,1.0000,0.0962"></div>
+
+<h2>Complessi simpliciali astratti</h2>
+<h3>Definizione</h3>
+<p>Un complesso simpliciale astratto è una collezione $\mathcal{A}$ di insiemi finiti tale che $A \in \mathcal{A} \implies \forall B \subseteq A, \ B \in \mathcal{A}$.</p>
+<p>$A \in \mathcal{A}$ è un simplesso, $\dim A = \#A - 1$. I vertici di $\mathcal{A}$ sono gli elementi di $\mathcal{A}$ con un elemento. $\dim \mathcal{A} = \max_{A \in \mathcal{A}} \{\dim A\}$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="6" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.1275,1.0000,0.1594"></div>
+
+<p>Osservazione: $\mathcal{A} \subseteq \mathcal{P}_{\text{fin}}(V)$.</p>
+<h3>Dal geometrico all'astratto</h3>
+<p>Se $K$ è un complesso simpliciale geometrico, lo schema dei vertici $\mathcal{A}$, $V(K)$, con $A \subset \mathcal{A}$ se i vertici di un $\sigma \in K$ generano $A$, è il complesso astratto associato (con quelle caratteristiche).</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="6" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.2385,1.0000,0.1747"></div>
+
+<p>Viceversa, $K$ si chiama realizzazione geometrica di $\mathcal{A}$.</p>
+<p>Se $\mathcal{A}$ è un complesso simpliciale astratto e $K_1, K_2$ sono realizzazioni geometriche di $\mathcal{A}$, allora $\exists f: |K_1| \longrightarrow |K_2|$ isomorfismo simpliciale.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="6" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.4132,1.0000,0.1464"></div>
+
+<p>Esempio: $\mathcal{A} = \{\{a\}, \{b\}, \{c\}, \{a,b\}, \{a,c\}\}$ ha come realizzazione geometrica una "V" (due segmenti con un vertice in comune).</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="6" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.5596,1.0000,0.0980"></div>
+
+<h3>Teorema</h3>
+<ol>
+<li>$\mathcal{A}$ complesso simpliciale astratto $\implies \mathcal{A}$ ha una realizzazione geometrica;</li>
+<li>$\mathcal{A}$ finito, $\dim \mathcal{A} = n \implies \mathcal{A}$ ha una realizzazione in $\mathbb{R}^{2n+1}$.</li>
+</ol>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="6" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.6063,1.0000,0.1440"></div>
+
+<h3>Dimostrazione (1) nel caso in cui $\mathcal{A}$ è finito</h3>
+<p>Se $\mathcal{A}$ è finito, $V$ è un insieme finito.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="7" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0000,1.0000,0.0968"></div>
+
+<p>Ci mettiamo in $\mathbb{R}^{|V|}$ con $\Delta^{|V|} = [E_1, \dots, E_{|V|}]$: dato $A = \{v_{i_0}, \dots, v_{i_k}\} \subseteq \mathcal{A}$ lo mandiamo in $[E_{i_0}, \dots, E_{i_k}]$. È ovvio che è un sottocomplesso perché è chiuso rispetto al contenuto.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="7" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.0632,1.0000,0.1924"></div>
+
+<h3>Dimostrazione (2)</h3>
+<p>In $\mathbb{R}^{2n+1}$ consideriamo i punti della curva momento $p_i = (i, i^2, \dots, i^{2n+1})$ con $i = 1, \dots, |V|$. Questi $p_i$ sono in posizione generale: comunque ne prendo $2n+2$, questi sono affinemente indipendenti (se aggiungo un $1$ e li metto in colonna ho la matrice di Vandermonde che ha determinante $\neq 0$, quindi sono in posizione generale).</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="7" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.2237,1.0000,0.0957"></div>
+
+<p>Presi $V_1, \dots, V_{|V|} \in V$, mando $V_i \longmapsto p_i$, quindi $\{V_{i_0}, \dots, V_{i_k}\} \longmapsto [p_{i_0}, \dots, p_{i_k}]$.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="7" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.2875,1.0000,0.1440"></div>
+
+<p>Verifichiamo che $\tilde{\sigma} \cap \tilde{\tau} = \widetilde{\sigma \cap \tau}$: se $x = \sum \lambda_s p_{i_s} = \sum \mu_t p_{j_t}$, i punti $p_{i_s}, p_{j_t}$ sono al massimo $2n+2$; se $v_{i_s} \notin \sigma \cap \tau$ allora $\lambda_{i_s} = 0$ (e lo stesso per $\mu$), mentre se $p_{i_s} = p_{j_t}$ allora $\lambda_s = \mu_t$. $\square$</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="7" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.4315,1.0000,0.2651"></div>
+
+<p>Osservazione: ci sono complessi di dimensione $n$ che non si immergono in $\mathbb{R}^{2n}$: ad esempio con $V(Q) = \{v_1, \dots, v_5\}$ e $\mathcal{A} = \{A \mid \#A \leq 2\}$ non si immerge in $\mathbb{R}^2$ ma in $\mathbb{R}^3$ sì.</p>
+<div class="sync-marker" data-title="02.pdf" data-kind="pages" data-base="assets/02/page" data-count="7" data-page="7" data-file="../../data/courses/elem-topologia-algebrica/raw_notes/02.pdf" data-box="0.0000,0.8418,1.0000,0.1582"></div>
+
+<h3>Definizione (Approssimazione simpliciale)</h3>
+<p>$f: |K| \longrightarrow |L|$ continua; $g: |K| \longrightarrow |L|$ applicazione simpliciale è un'approssimazione simpliciale di $f$ se vale la condizione star: $g(\operatorname{St}_K(v)) \subseteq \operatorname{St}_L(g(v))$ per ogni vertice.</p>
+<div class="sync-marker ref-marker" data-title="Elements_of_Algebraic_Topology,_Second_Edition_James_R_Munkres,.pdf" data-kind="page" data-src="assets/Elements_of_Algebraic_Topology__Second_Edition_James_R_Munkres/page-136.png" data-file="../../data/reference_books/Elements_of_Algebraic_Topology%2C_Second_Edition_James_R_Munkres%2C.pdf" data-page="136" data-total="584"></div>
+
+<p>In Munkres si dimostra che applicazioni omotope inducono lo stesso omomorfismo in omologia: è la motivazione delle approssimazioni simpliciali, che realizzano una mappa continua con una mappa simpliciale omotopa a essa.</p>
+  </div>
+  <div class="viewer-pane">
+    <div class="viewer-container" id="viewer-container">
+      <div class="img-wrap" id="img-wrap">
+        <img id="viewer-img" class="viewer-el" alt="Source note page">
+        <div class="box-overlay" id="box-overlay"></div>
+      </div>
+      <object id="viewer-obj" class="viewer-el" type="application/pdf"></object>
+      <div id="empty-state" class="pane-msg">Hover over a section on the left to view its source.</div>
+      <div id="missing-state" class="pane-msg warning" style="display:none;"></div>
+      <div id="link-state" class="pane-msg" style="display:none;"></div>
+      <div id="page-nav">
+        <button id="prev-page" title="Previous page">&#8249;</button>
+        <span id="page-label">1 / 1</span>
+        <button id="next-page" title="Next page">&#8250;</button>
+      </div>
+      <a id="open-doc" class="open-doc" href="#" target="_blank" rel="noopener">Open document</a>
+    </div>
+    <div id="ref-viewer-text" class="ref-text">Awaiting synchronization...</div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  /* ---------------------------------------------------------------
+   * 1. Group the document into hoverable sections.
+   *    Every [source:]/[ref:] marker opens a new section; content
+   *    before the first marker becomes a section without a source.
+   * ------------------------------------------------------------- */
+  const textPane = document.getElementById('text-pane');
+  const wrappers = [];
+  let currentWrapper = null;
+
+  Array.from(textPane.children).forEach(child => {
+    if (child.classList && child.classList.contains('sync-marker')) {
+      currentWrapper = document.createElement('section');
+      currentWrapper.className = 'content-section';
+      Object.keys(child.dataset).forEach(key => {
+        currentWrapper.dataset[key] = child.dataset[key];
+      });
+      currentWrapper.dataset.side = child.classList.contains('ref-marker') ? 'ref' : 'source';
+      currentWrapper.dataset.idx = String(wrappers.length);
+      textPane.insertBefore(currentWrapper, child);
+      child.style.display = 'none';
+      currentWrapper.appendChild(child);
+      wrappers.push(currentWrapper);
+    } else if (currentWrapper) {
+      currentWrapper.appendChild(child);
+    } else {
+      currentWrapper = document.createElement('section');
+      currentWrapper.className = 'content-section';
+      currentWrapper.dataset.kind = 'none';
+      currentWrapper.dataset.side = 'source';
+      currentWrapper.dataset.idx = String(wrappers.length);
+      textPane.insertBefore(currentWrapper, child);
+      wrappers.push(currentWrapper);
+      currentWrapper.appendChild(child);
+    }
+  });
+
+  /* ---------------------------------------------------------------
+   * 2. Viewer state and helpers.
+   * ------------------------------------------------------------- */
+  const img = document.getElementById('viewer-img');
+  const obj = document.getElementById('viewer-obj');
+  const box = document.getElementById('box-overlay');
+  const emptyState = document.getElementById('empty-state');
+  const missingState = document.getElementById('missing-state');
+  const linkState = document.getElementById('link-state');
+  const nav = document.getElementById('page-nav');
+  const prevBtn = document.getElementById('prev-page');
+  const nextBtn = document.getElementById('next-page');
+  const pageLabel = document.getElementById('page-label');
+  const openLink = document.getElementById('open-doc');
+  const chip = document.getElementById('ref-viewer-text');
+  const container = document.getElementById('viewer-container');
+
+  const view = { key: '', kind: 'none', base: '', count: 0, page: 1, file: '', box: null, boxPage: 0 };
+
+  function hideAll() {
+    img.style.display = 'none';
+    obj.style.display = 'none';
+    emptyState.style.display = 'none';
+    missingState.style.display = 'none';
+    linkState.style.display = 'none';
+    box.style.display = 'none';
+    nav.classList.remove('visible');
+    openLink.style.display = 'none';
+  }
+
+  function flash() {
+    container.classList.remove('flash');
+    void container.offsetWidth; // reflow -> restart animation
+    container.classList.add('flash');
+  }
+
+  function setBox() {
+    if (view.box && view.page === view.boxPage) {
+      const [x, y, w, h] = view.box.split(',').map(Number);
+      box.style.left = (x * 100) + '%';
+      box.style.top = (y * 100) + '%';
+      box.style.width = (w * 100) + '%';
+      box.style.height = (h * 100) + '%';
+      box.style.display = 'block';
+    } else {
+      box.style.display = 'none';
+    }
+  }
+
+  function setPage(page) {
+    view.page = Math.min(Math.max(page, 1), view.count);
+    img.src = view.base + '-' + view.page + '.png';
+    pageLabel.textContent = view.page + ' / ' + view.count;
+    prevBtn.disabled = view.page <= 1;
+    nextBtn.disabled = view.page >= view.count;
+    if (view.file) {
+      openLink.href = view.file + '#page=' + view.page;
+      openLink.style.display = 'inline';
+    }
+    setBox();
+  }
+
+  function chipText(side, title, suffix) {
+    chip.textContent = '';
+    const strong = document.createElement('strong');
+    strong.textContent = side + ':';
+    chip.append(strong, ' ' + title + (suffix || ''));
+  }
+
+  /* ---------------------------------------------------------------
+   * 3. Show the source that belongs to one section.
+   * ------------------------------------------------------------- */
+  function show(section) {
+    const d = section.dataset;
+    const key = [d.idx, d.kind, d.src || '', d.base || '', d.file || '',
+                 d.page || '', d.box || '', d.title || ''].join('|');
+    if (key === view.key) return;
+    view.key = key;
+
+    hideAll();
+    const side = d.side === 'ref' ? 'Reference' : 'Source Note';
+
+    switch (d.kind) {
+      case 'image': {
+        view.kind = 'image';
+        view.count = 1;
+        view.page = 1;
+        view.file = '';
+        view.box = d.box || null;
+        view.boxPage = 1;
+        img.src = d.src;
+        img.style.display = 'block';
+        setBox();
+        chipText(side, d.title, d.box ? ' (highlighted region)' : '');
+        break;
+      }
+      case 'page': {
+        // A single rasterized page of a reference PDF.
+        view.kind = 'page';
+        view.count = 1;
+        view.page = Number(d.page) || 1;
+        view.file = d.file || '';
+        view.box = d.box || null;
+        view.boxPage = view.page;
+        img.src = d.src;
+        img.style.display = 'block';
+        setBox();
+        chipText(side, d.title, ' - page ' + view.page + ' / ' + (d.total || '?'));
+        openLink.href = view.file + '#page=' + view.page;
+        openLink.style.display = view.file ? 'inline' : 'none';
+        break;
+      }
+      case 'pages': {
+        // Every page of a source PDF was rasterized: browsable + box overlay.
+        view.kind = 'pages';
+        view.base = d.base;
+        view.count = Number(d.count) || 1;
+        view.file = d.file || '';
+        view.box = d.box || null;
+        view.boxPage = Number(d.page) || 1;
+        img.style.display = 'block';
+        nav.classList.add('visible');
+        setPage(view.boxPage);
+        chipText(side, d.title);
+        break;
+      }
+      case 'doc': {
+        // Whole reference book in the browser's native PDF viewer.
+        view.kind = 'doc';
+        view.count = 0;
+        view.page = 1;
+        view.file = d.file;
+        view.box = null;
+        if (obj.getAttribute('data') !== d.file) obj.setAttribute('data', d.file);
+        obj.style.display = 'block';
+        openLink.href = d.file;
+        openLink.style.display = 'inline';
+        chipText(side, d.title);
+        break;
+      }
+      case 'link': {
+        view.kind = 'link';
+        linkState.textContent = '';
+        const anchor = document.createElement('a');
+        anchor.href = d.file;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener';
+        anchor.textContent = 'Open ' + d.title;
+        linkState.append(anchor);
+        linkState.style.display = 'block';
+        chipText(side, d.title);
+        break;
+      }
+      case 'missing': {
+        view.kind = 'missing';
+        missingState.textContent = 'File not found: ' + d.title;
+        missingState.style.display = 'block';
+        chip.className = 'ref-text missing';
+        chip.textContent = 'Missing file: ' + d.title;
+        flash();
+        return;
+      }
+      default: {
+        // Section without a linked source.
+        view.kind = 'none';
+        emptyState.textContent = 'This section has no linked source.';
+        emptyState.style.display = 'block';
+        chip.className = 'ref-text';
+        chip.textContent = 'No source linked.';
+        flash();
+        return;
+      }
+    }
+
+    chip.className = 'ref-text ' + (d.side === 'ref' ? 'reference' : 'source');
+    flash();
+  }
+
+  /* ---------------------------------------------------------------
+   * 4. Wire up hover + page navigation.
+   * ------------------------------------------------------------- */
+  wrappers.forEach(wrapper => {
+    wrapper.addEventListener('mouseenter', () => {
+      wrappers.forEach(w => w.classList.remove('active'));
+      wrapper.classList.add('active');
+      show(wrapper);
+    });
+  });
+  prevBtn.addEventListener('click', () => setPage(view.page - 1));
+  nextBtn.addEventListener('click', () => setPage(view.page + 1));
+
+  hideAll();
+  const first = wrappers.find(w => w.dataset.kind && w.dataset.kind !== 'none') || wrappers[0];
+  if (first) {
+    first.classList.add('active');
+    show(first);
+  } else {
+    emptyState.style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>
