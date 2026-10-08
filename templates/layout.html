@@ -13,7 +13,8 @@
   .container { display: flex; height: 100vh; overflow: hidden; }
 
   /* ---- Left pane: transcribed / rewritten notes ---- */
-  .text-pane { width: 50%; padding: 2rem; overflow-y: auto; box-sizing: border-box; font-size: 1.05rem; }
+  .text-wrap { width: 50%; position: relative; display: flex; min-height: 0; }
+  .text-pane { flex: 1 1 auto; width: 100%; padding: 2rem; overflow-y: auto; box-sizing: border-box; font-size: 1.05rem; }
   .content-section {
     padding: 0.75rem 1.25rem;
     margin: 0.75rem 0;
@@ -46,29 +47,45 @@
     align-items: center;
     justify-content: center;
     background: #fff;
+    border: 2px solid #adb5bd;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     overflow: hidden;
-    transition: box-shadow 0.3s ease;
+    transition: border-color 0.2s ease, box-shadow 0.3s ease;
   }
-  .viewer-container.flash {
+  .viewer-container.active-view {
+    border-color: var(--accent);
     box-shadow: 0 0 0 4px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   .viewer-el { display: none; }
   #viewer-obj { width: 100%; height: 100%; border: none; }
 
-  /* Image sized to its natural box so the overlay's % coords match the page */
-  .img-wrap { position: relative; display: flex; max-width: 100%; }
-  #viewer-img { display: block; max-width: 100%; max-height: calc(100vh - 11rem); object-fit: contain; }
+  /* Image sized to its natural box so the overlay's % coords match the page.
+     The outer .img-wrap is the zoom viewport (scrolls when zoomed); the
+     inner .zoom-inner shrink-wraps the image so the overlay's % coords
+     stay aligned at any zoom level. No border here: the gray/blue frame
+     is the .viewer-container border above. */
+  .img-wrap {
+    position: relative;
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 11rem);
+    overflow: auto;
+  }
+  .img-wrap.zoomed { cursor: grab; }
+  .img-wrap.panning { cursor: grabbing; }
+  .zoom-inner { position: relative; display: inline-block; max-width: 100%; }
+  #viewer-img { display: block; max-width: 100%; max-height: calc(100vh - 12rem); width: auto; height: auto; object-fit: contain; }
+  .img-wrap.zoomed .zoom-inner { max-width: none; }
+  .img-wrap.zoomed #viewer-img { max-width: none; max-height: none; width: 100%; }
 
   .box-overlay {
     position: absolute;
     display: none;
     /* border-box: the md's x,y,w,h IS the outer rectangle, so the border
-       stays where the agent placed it. Kept thin (2px) so a highlight
-       border never eats the handwriting at the edge of a line. */
+       stays where the agent placed it. */
     box-sizing: border-box;
-    border: 2px solid var(--accent);
+    border: 4px solid var(--accent);
     background: var(--accent-soft);
     border-radius: 6px;
     pointer-events: none;
@@ -78,6 +95,37 @@
     from { box-shadow: 0 0 0 rgba(0, 123, 255, 0); }
     to   { box-shadow: 0 0 12px rgba(0, 123, 255, 0.6); }
   }
+
+  /* Floating per-pane zoom buttons (same steps as Ctrl+wheel) */
+  .zoom-bar {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #dee2e6;
+    border-radius: 999px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    z-index: 5;
+  }
+  .zoom-bar button {
+    border: 1px solid #ced4da;
+    background: #fff;
+    border-radius: 6px;
+    min-width: 1.8rem;
+    height: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .zoom-bar button:disabled { opacity: 0.35; cursor: default; }
+  .zoom-bar .zoom-level { min-width: 2.6rem; text-align: center; color: #495057; }
+  #text-zoom { top: 0.6rem; right: 0.8rem; }
+  #img-zoom { top: 0.6rem; left: 0.8rem; }
+  #img-zoom { display: none; }
+  #img-zoom.visible { display: flex; }
 
   .pane-msg { color: #6c757d; text-align: center; padding: 1.5rem; max-width: 32rem; }
   .pane-msg.warning { color: #c0392b; }
@@ -155,14 +203,24 @@
 </head>
 <body>
 <div class="container">
-  <div class="text-pane" id="text-pane">
-    {{ html_content }}
+  <div class="text-wrap">
+    <div class="text-pane" id="text-pane">
+      {{ html_content }}
+    </div>
+    <div class="zoom-bar" id="text-zoom" title="Zoom transcribed notes">
+      <button id="text-zoom-out" title="Zoom out notes">−</button>
+      <span class="zoom-level" id="text-zoom-level">100%</span>
+      <button id="text-zoom-in" title="Zoom in notes">+</button>
+      <button id="text-zoom-reset" title="Reset notes zoom">⟲</button>
+    </div>
   </div>
   <div class="viewer-pane">
     <div class="viewer-container" id="viewer-container">
       <div class="img-wrap" id="img-wrap">
-        <img id="viewer-img" class="viewer-el" alt="Source note page">
-        <div class="box-overlay" id="box-overlay"></div>
+        <div class="zoom-inner" id="zoom-inner">
+          <img id="viewer-img" class="viewer-el" alt="Source note page">
+          <div class="box-overlay" id="box-overlay"></div>
+        </div>
       </div>
       <object id="viewer-obj" class="viewer-el" type="application/pdf"></object>
       <div id="empty-state" class="pane-msg">Hover over a section on the left to view its source.</div>
@@ -174,6 +232,12 @@
         <button id="next-page" title="Next page">&#8250;</button>
       </div>
       <a id="open-doc" class="open-doc" href="#" target="_blank" rel="noopener">Open document</a>
+      <div class="zoom-bar" id="img-zoom" title="Zoom source image">
+        <button id="img-zoom-out" title="Zoom out image">−</button>
+        <span class="zoom-level" id="img-zoom-level">100%</span>
+        <button id="img-zoom-in" title="Zoom in image">+</button>
+        <button id="img-zoom-reset" title="Reset image zoom">⟲</button>
+      </div>
     </div>
     <div id="ref-viewer-text" class="ref-text">Awaiting synchronization...</div>
   </div>
@@ -232,11 +296,66 @@ document.addEventListener('DOMContentLoaded', () => {
   const openLink = document.getElementById('open-doc');
   const chip = document.getElementById('ref-viewer-text');
   const container = document.getElementById('viewer-container');
+  const viewerPane = document.querySelector('.viewer-pane');
+  const imgWrap = document.getElementById('img-wrap');
+  const zoomInner = document.getElementById('zoom-inner');
+  const imgZoomBar = document.getElementById('img-zoom');
+  const imgZoomIn = document.getElementById('img-zoom-in');
+  const imgZoomOut = document.getElementById('img-zoom-out');
+  const imgZoomReset = document.getElementById('img-zoom-reset');
+  const imgZoomLevel = document.getElementById('img-zoom-level');
+  const textZoomIn = document.getElementById('text-zoom-in');
+  const textZoomOut = document.getElementById('text-zoom-out');
+  const textZoomReset = document.getElementById('text-zoom-reset');
+  const textZoomLevel = document.getElementById('text-zoom-level');
 
   const view = { key: '', kind: 'none', base: '', count: 0, page: 1, file: '', box: null, boxPage: 0 };
 
+  /* Per-pane zoom state. Left = font scale, right = image width scale.
+     Ctrl+wheel over a pane zooms that pane only (and suppresses the
+     browser's whole-page zoom); plain wheel keeps scrolling. */
+  const BASE_FONT = 1.05;
+  let textZoom = 1;
+  let imgZoom = 1;
+  const IMG_MIN = 1, IMG_MAX = 5;
+
+  function isImageView() {
+    return (view.kind === 'image' || view.kind === 'page' || view.kind === 'pages')
+      && img.style.display !== 'none';
+  }
+
+  function applyImgZoom() {
+    if (!isImageView()) { imgWrap.classList.remove('zoomed'); return; }
+    if (imgZoom <= 1.01) {
+      zoomInner.style.width = '';
+      imgWrap.classList.remove('zoomed');
+    } else {
+      const baseW = Math.max(imgWrap.clientWidth, 50);
+      zoomInner.style.width = (baseW * imgZoom) + 'px';
+      imgWrap.classList.add('zoomed');
+    }
+    updateZoomUI();
+  }
+
+  function resetImgZoom() {
+    imgZoom = 1;
+    if (imgWrap) { imgWrap.scrollTop = 0; imgWrap.scrollLeft = 0; }
+    applyImgZoom();
+  }
+
+  function updateZoomUI() {
+    textZoomLevel.textContent = Math.round(textZoom * 100) + '%';
+    imgZoomLevel.textContent = Math.round(imgZoom * 100) + '%';
+    const imgView = isImageView();
+    imgZoomBar.classList.toggle('visible', imgView);
+    imgZoomIn.disabled = !imgView || imgZoom >= IMG_MAX - 1e-9;
+    imgZoomOut.disabled = !imgView || imgZoom <= IMG_MIN + 1e-9;
+    imgZoomReset.disabled = !imgView;
+  }
+
   function hideAll() {
     img.style.display = 'none';
+    imgWrap.style.display = 'none';
     obj.style.display = 'none';
     emptyState.style.display = 'none';
     missingState.style.display = 'none';
@@ -244,12 +363,6 @@ document.addEventListener('DOMContentLoaded', () => {
     box.style.display = 'none';
     nav.classList.remove('visible');
     openLink.style.display = 'none';
-  }
-
-  function flash() {
-    container.classList.remove('flash');
-    void container.offsetWidth; // reflow -> restart animation
-    container.classList.add('flash');
   }
 
   function setBox() {
@@ -267,6 +380,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setPage(page) {
     view.page = Math.min(Math.max(page, 1), view.count);
+    imgWrap.style.display = 'block';
+    img.style.display = 'block';
     img.src = view.base + '-' + view.page + '.png';
     pageLabel.textContent = view.page + ' / ' + view.count;
     prevBtn.disabled = view.page <= 1;
@@ -276,6 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
       openLink.style.display = 'inline';
     }
     setBox();
+    applyImgZoom();
   }
 
   function chipText(side, title, suffix) {
@@ -296,6 +412,10 @@ document.addEventListener('DOMContentLoaded', () => {
     view.key = key;
 
     hideAll();
+    imgZoom = 1;
+    zoomInner.style.width = '';
+    imgWrap.classList.remove('zoomed');
+    imgWrap.scrollTop = 0; imgWrap.scrollLeft = 0;
     const side = d.side === 'ref' ? 'Reference' : 'Source Note';
 
     switch (d.kind) {
@@ -306,6 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
         view.file = '';
         view.box = d.box || null;
         view.boxPage = 1;
+        imgWrap.style.display = 'block';
         img.src = d.src;
         img.style.display = 'block';
         setBox();
@@ -320,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
         view.file = d.file || '';
         view.box = d.box || null;
         view.boxPage = view.page;
+        imgWrap.style.display = 'block';
         img.src = d.src;
         img.style.display = 'block';
         setBox();
@@ -375,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
         missingState.style.display = 'block';
         chip.className = 'ref-text missing';
         chip.textContent = 'Missing file: ' + d.title;
-        flash();
+        updateZoomUI();
         return;
       }
       default: {
@@ -385,13 +507,13 @@ document.addEventListener('DOMContentLoaded', () => {
         emptyState.style.display = 'block';
         chip.className = 'ref-text';
         chip.textContent = 'No source linked.';
-        flash();
+        updateZoomUI();
         return;
       }
     }
 
     chip.className = 'ref-text ' + (d.side === 'ref' ? 'reference' : 'source');
-    flash();
+    updateZoomUI();
   }
 
   /* ---------------------------------------------------------------
@@ -406,6 +528,94 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   prevBtn.addEventListener('click', () => setPage(view.page - 1));
   nextBtn.addEventListener('click', () => setPage(view.page + 1));
+
+  /* ---------------------------------------------------------------
+   * 5. Per-pane zoom + cursor-driven frame. Page nav, open-doc link,
+   *    hover sync and box overlay are unchanged; the old flash-on-hover
+   *    is gone, the frame now follows the cursor side.
+   * ------------------------------------------------------------- */
+  // Left pane: Ctrl+wheel scales the transcribed-notes font.
+  textPane.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    textZoom = Math.min(2.0, Math.max(0.7, textZoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+    textPane.style.fontSize = (BASE_FONT * textZoom).toFixed(3) + 'rem';
+    updateZoomUI();
+  }, { passive: false });
+  textPane.addEventListener('dblclick', () => {
+    textZoom = 1;
+    textPane.style.fontSize = '';
+    updateZoomUI();
+  });
+
+  // Right pane: Ctrl+wheel anywhere inside the viewer frame (image or the
+  // white space between frame and image) scales the page image (1x..5x).
+  // Plain wheel scrolls the zoomed image; drag-to-pan works when zoomed.
+  container.addEventListener('wheel', (e) => {
+    if (!isImageView()) return;
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    imgZoom = Math.min(IMG_MAX, Math.max(IMG_MIN, imgZoom * (e.deltaY < 0 ? 1.15 : 0.87)));
+    applyImgZoom();
+  }, { passive: false });
+  imgWrap.addEventListener('dblclick', () => resetImgZoom());
+  img.addEventListener('load', () => applyImgZoom());
+
+  let panning = false, panX = 0, panY = 0, panL = 0, panT = 0;
+  imgWrap.addEventListener('mousedown', (e) => {
+    if (!imgWrap.classList.contains('zoomed')) return;
+    panning = true;
+    panX = e.clientX; panY = e.clientY;
+    panL = imgWrap.scrollLeft; panT = imgWrap.scrollTop;
+    imgWrap.classList.add('panning');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!panning) return;
+    imgWrap.scrollLeft = panL - (e.clientX - panX);
+    imgWrap.scrollTop = panT - (e.clientY - panY);
+  });
+  window.addEventListener('mouseup', () => {
+    panning = false;
+    imgWrap.classList.remove('panning');
+  });
+
+  // Left pane buttons: same steps as the wheel (x1.1 in, x0.9 out).
+  textZoomIn.addEventListener('click', () => {
+    textZoom = Math.min(2.0, textZoom * 1.1);
+    textPane.style.fontSize = (BASE_FONT * textZoom).toFixed(3) + 'rem';
+    updateZoomUI();
+  });
+  textZoomOut.addEventListener('click', () => {
+    textZoom = Math.max(0.7, textZoom * 0.9);
+    textPane.style.fontSize = (BASE_FONT * textZoom).toFixed(3) + 'rem';
+    updateZoomUI();
+  });
+  textZoomReset.addEventListener('click', () => {
+    textZoom = 1;
+    textPane.style.fontSize = '';
+    updateZoomUI();
+  });
+
+  // Right pane buttons: same steps as the wheel (x1.15 in, x0.87 out).
+  imgZoomIn.addEventListener('click', () => {
+    if (!isImageView()) return;
+    imgZoom = Math.min(IMG_MAX, imgZoom * 1.15);
+    applyImgZoom();
+  });
+  imgZoomOut.addEventListener('click', () => {
+    if (!isImageView()) return;
+    imgZoom = Math.max(IMG_MIN, imgZoom * 0.87);
+    applyImgZoom();
+  });
+  imgZoomReset.addEventListener('click', () => resetImgZoom());
+
+  // Gray/blue frame on the existing viewer border: blue while the cursor
+  // is on the right side, gray otherwise.
+  if (viewerPane) {
+    viewerPane.addEventListener('mouseenter', () => container.classList.add('active-view'));
+    viewerPane.addEventListener('mouseleave', () => container.classList.remove('active-view'));
+  }
 
   hideAll();
   const first = wrappers.find(w => w.dataset.kind && w.dataset.kind !== 'none') || wrappers[0];
